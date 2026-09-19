@@ -162,6 +162,51 @@ To run from a checkout without installing: `CLAUDE_CODE_ENABLE_FUNCTION_HOOKS=1 
 from the repository root. No publishing step is required; the marketplace is
 just the repo's `.claude-plugin/marketplace.json`.
 
+## opencode plugin
+
+The same library ships as an opencode plugin in `.opencode/plugins/` (adapter
+in `src/opencode.ts`, tested without network in `tests/opencode.test.ts`):
+
+- `experimental.chat.messages.transform` scores every completed tool call with
+  Jev and truncates/removes stale outputs **in place** before the request
+  reaches the model. Stored session history is untouched; only the tokens sent
+  shrink. Each history shape costs at most one Jev pass (fingerprinted cache),
+  histories with fewer than `pruneMinToolCalls` completed calls are skipped,
+  below-`minReductionRatio` results are left alone, and any Jev failure leaves
+  the payload unchanged.
+- `experimental.session.compacting` injects the Jev verdicts into the
+  compaction prompt so the summarizer omits what Jev already dropped. Set
+  `replacePrompt: true` to replace the summary prompt with a
+  verbatim-preserving one instead.
+
+### Install in opencode
+
+Open this repo in opencode (`.opencode/plugins/` loads automatically) and set
+`TYPESAFE_API_KEY`, e.g. in `~/.config/opencode/opencode.json`
+(`{env:TYPESAFE_API_KEY}` also works in config values). The repo's
+`opencode.json` keeps automatic compaction enabled alongside the plugin.
+
+To reuse it in another project, copy
+`.opencode/plugins/fast-jev-compaction.ts` there and point its `../../src/`
+imports at the `fast-jev-compaction` npm package instead.
+
+For a user-level install (all projects): add
+`"fast-jev-compaction": "file:<checkout-path>"` to the `dependencies` of
+`~/.config/opencode/package.json`, copy the plugin to
+`~/.config/opencode/plugins/fast-jev-compaction.ts` with its imports pointed
+at the `fast-jev-compaction` package, and run `bun install` there
+(opencode also does this at startup). Re-run `npm run build` in the checkout
+after changing `src/`, then `bun install` again if the `file:` dependency
+was copied rather than linked.
+
+Extra options beyond the library table above (all optional):
+
+| Option | Default | Description |
+| --- | --- | --- |
+| `pruneMinToolCalls` | `8` | Completed tool calls required before a Jev pass runs |
+| `replacePrompt` | `false` | Replace (instead of extend) the compaction prompt |
+| `enabled` | `true` | Master switch for both hooks |
+
 ## Development
 
 ```sh
